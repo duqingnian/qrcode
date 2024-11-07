@@ -19,10 +19,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Qt and OpenSSL dependencies
+      - name: Set PATH for Qt static
+        shell: pwsh
         run: |
-          choco install -y qt6-win-static openssl
-          set PATH=C:\Qt\6.5.0\msvc2019_64_static\bin;%PATH%  # Adjust path based on Qt static version installed
+          $Env:PATH = "C:\Qt\6.5.0\msvc2019_64_static\bin;" + $Env:PATH  # Adjust path based on actual Qt installation
+
+      - name: Install OpenSSL
+        run: |
+          choco install openssl -y
+          refreshenv
 
       - name: Configure CMake
         run: cmake -B build -S . -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} -DCMAKE_PREFIX_PATH="C:\Qt\6.5.0\msvc2019_64_static" -DOPENSSL_USE_STATIC_LIBS=TRUE
@@ -31,16 +36,16 @@ jobs:
         run: cmake --build build --config ${{ env.BUILD_TYPE }}
 
       - name: Package executable
+        shell: pwsh
         run: |
-          mkdir -p release
-          cp build/**/Qrcode.exe release/
-      
+          mkdir release
+          Copy-Item -Path build\**\Qrcode.exe -Destination release\
+
       - name: Upload release asset
         uses: actions/upload-artifact@v3
         with:
           name: Qrcode
           path: release/Qrcode.exe
-
 
   release:
     needs: build
@@ -57,7 +62,7 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          artifacts: Qrcode.exe
+          artifacts: release/Qrcode.exe
           tag: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           body: "Automated release of Qrcode v${{ github.ref_name }}"
